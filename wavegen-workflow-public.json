@@ -1,0 +1,632 @@
+{
+  "name": "WAVEGEN v3 — Claude + ElevenLabs + Creatomate + YouTube",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * *"
+            }
+          ]
+        }
+      },
+      "id": "a36877a0-0db3-4d12-b116-236c6b0f0661",
+      "name": "⏰ Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -752,
+        400
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_ANTHROPIC_API_KEY"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"model\": \"claude-sonnet-4-5\",\n  \"max_tokens\": 1000,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a creative director for an AI music video channel. Generate a COMPLETELY UNIQUE concept for today's video.\\n\\nCurrent timestamp: {{ Date.now() }}\\nRandom seed: {{ Math.floor(Math.random() * 100000) }}\\n\\nAVOID these overused themes: rain, lo-fi, solitude, melancholic, cosmos, ocean, night, dreams. They were used recently.\\n\\nINSTEAD pick something UNEXPECTED and SPECIFIC from these categories — use the random seed to pick:\\n- Industrial: abandoned factory, rusty machinery, steam tunnels, neon arcade, cyberpunk alley\\n- Nature: frozen river, autumn forest, lavender field, volcanic landscape, desert dunes, glacier ice\\n- Urban: tokyo street, paris cafe, mumbai market, new york subway, vintage diner, rooftop bar\\n- Surreal: glass forest, paper city, mirror lake, floating islands, neon swamp, crystal cave\\n- Retro: 80s synthwave, vintage film, vinyl record, old polaroid, retro arcade, classic car\\n- Movement: train window, ocean waves, wind in grass, falling leaves, running water, flying birds\\n\\nMake the music style match the theme. Make subtitle lines poetic and unique to the theme.\\n\\nReturn ONLY valid JSON, no markdown, no backticks, no explanation:\\n{\\n  \\\"theme\\\": \\\"one word theme\\\",\\n  \\\"mood\\\": \\\"emotional tone description\\\",\\n  \\\"elevenlabs_prompt\\\": \\\"detailed music description matching the theme, include instruments, tempo, mood, style, max 200 chars\\\",\\n  \\\"pexels_query\\\": \\\"3-4 specific words for vertical cinematic video search\\\",\\n  \\\"subtitle_line_1\\\": \\\"short poetic line max 5 words\\\",\\n  \\\"subtitle_line_2\\\": \\\"short poetic line max 5 words\\\",\\n  \\\"subtitle_line_3\\\": \\\"short poetic line max 5 words\\\",\\n  \\\"youtube_title\\\": \\\"YouTube Shorts title max 60 chars with emoji\\\",\\n  \\\"youtube_description\\\": \\\"2-3 lines with hashtags #aimusic #shorts\\\",\\n  \\\"youtube_tags\\\": [\\\"aimusic\\\", \\\"shorts\\\", \\\"chill\\\", \\\"lofi\\\", \\\"viral\\\"]\\n}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "de7a542e-3866-47c0-abe9-c1769471349a",
+      "name": "🧠 Claude — Generate Concept",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -512,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.content[0].text;\nconst cleaned = raw.replace(/```json|```/g, '').trim();\ntry {\n  const concept = JSON.parse(cleaned);\n  return [{ json: concept }];\n} catch(e) {\n  throw new Error('Claude JSON parse error: ' + e.message + ' | Raw: ' + cleaned.substring(0, 200));\n}"
+      },
+      "id": "c4ae0b4f-7681-4c64-9fc4-a066fa8bed94",
+      "name": "⚙️ Parse Claude JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.elevenlabs.io/v1/sound-generation",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xi-api-key",
+              "value": "YOUR_ELEVENLABS_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"{{ $json.elevenlabs_prompt }}\",\n  \"duration_seconds\": 30,\n  \"prompt_influence\": 0.5\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "f208f0c7-7611-49ba-b52d-9deb46398943",
+      "name": "🎵 ElevenLabs — Generate Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -272,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\n\n// Convert tmpfiles.org page URL to direct download URL\nconst pageUrl = data.data.url;\nconst directUrl = pageUrl.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');\n\nreturn [{ json: { audio_url: directUrl } }];"
+      },
+      "id": "8dd5ddef-5829-45d4-a624-1774cffefbf4",
+      "name": "⚙️ Extract Audio URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.pexels.com/videos/search?query={{ encodeURIComponent($json.pexels_query) }}&per_page=20&orientation=portrait&size=medium",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "YOUR_PEXELS_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e33edcb4-ff31-4513-b566-4d9227c4bf0a",
+      "name": "🎬 Pexels — Search Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        416,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const pexels = $input.first().json;\nif (!pexels.videos || pexels.videos.length === 0) {\n  throw new Error('Pexels returned no videos');\n}\nconst picked = pexels.videos[Math.floor(Math.random() * Math.min(pexels.videos.length, 4))];\nconst file = picked.video_files\n  .filter(f => f.height > f.width)\n  .sort((a, b) => b.height - a.height)[0] || picked.video_files[0];\n\nconst concept = $('⚙️ Parse Claude JSON').first().json;\nconst audio = $('⚙️ Extract Audio URL').first().json;  // ← добавить\n\nreturn [{ json: { \n  ...concept, \n  audio_url: audio.audio_url,  // ← добавить\n  video_url: file.link \n} }];"
+      },
+      "id": "631b263c-88ce-438f-8c43-9107bc87309c",
+      "name": "⚙️ Pick Portrait Video",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.creatomate.com/v1/renders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_CREATOMATE_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"source\": {\n    \"output_format\": \"mp4\",\n    \"width\": 1080,\n    \"height\": 1920,\n    \"duration\": 30,\n    \"elements\": [\n      {\n        \"type\": \"video\",\n        \"track\": 1,\n        \"duration\": 30,\n        \"source\": \"{{ $json.video_url }}\",\n        \"volume\": \"0%\",\n        \"loop\": true,\n        \"fit\": \"cover\"\n      },\n      {\n        \"type\": \"audio\",\n        \"track\": 2,\n        \"duration\": 30,\n        \"source\": \"{{ $json.audio_url }}\",\n        \"audio_fade_out\": 2\n      },\n      {\n        \"type\": \"text\",\n        \"track\": 3,\n        \"time\": 2,\n        \"duration\": 4,\n        \"y\": \"75%\",\n        \"width\": \"90%\",\n        \"height\": \"15%\",\n        \"x_alignment\": \"50%\",\n        \"y_alignment\": \"50%\",\n        \"text\": \"{{ $json.subtitle_line_1 }}\",\n        \"font_weight\": \"700\",\n        \"font_size\": \"8 vmin\",\n        \"fill_color\": \"#ffffff\",\n        \"animations\": [{\"time\": 0, \"duration\": 0.5, \"type\": \"fade\"}]\n      },\n      {\n        \"type\": \"text\",\n        \"track\": 3,\n        \"time\": 8,\n        \"duration\": 4,\n        \"y\": \"75%\",\n        \"width\": \"90%\",\n        \"height\": \"15%\",\n        \"x_alignment\": \"50%\",\n        \"y_alignment\": \"50%\",\n        \"text\": \"{{ $json.subtitle_line_2 }}\",\n        \"font_weight\": \"700\",\n        \"font_size\": \"8 vmin\",\n        \"fill_color\": \"#ffffff\",\n        \"animations\": [{\"time\": 0, \"duration\": 0.5, \"type\": \"fade\"}]\n      },\n      {\n        \"type\": \"text\",\n        \"track\": 3,\n        \"time\": 14,\n        \"duration\": 4,\n        \"y\": \"75%\",\n        \"width\": \"90%\",\n        \"height\": \"15%\",\n        \"x_alignment\": \"50%\",\n        \"y_alignment\": \"50%\",\n        \"text\": \"{{ $json.subtitle_line_3 }}\",\n        \"font_weight\": \"700\",\n        \"font_size\": \"8 vmin\",\n        \"fill_color\": \"#ffffff\",\n        \"animations\": [{\"time\": 0, \"duration\": 0.5, \"type\": \"fade\"}]\n      }\n    ]\n  }\n}",
+        "options": {}
+      },
+      "id": "312a1142-aba3-4ab2-acbd-e6afdc5d4c57",
+      "name": "🎬 Creatomate — Render Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\n\n// Creatomate v2 returns array - find MP4, not JPG preview\nconst renders = Array.isArray(result) ? result : [result];\nconst render = renders.find(r => r.output_format === 'mp4') || renders[0];\n\nconst status = render.status;\nconst url = render.url;\n\nif (!url && status !== 'planned' && status !== 'rendering') {\n  throw new Error('Creatomate render failed: ' + JSON.stringify(render));\n}\n\nconst concept = $('⚙️ Pick Portrait Video').first().json;\nreturn [{ json: { \n  ...concept, \n  render_id: render.id, \n  final_video_url: url, \n  render_status: status \n} }];"
+      },
+      "id": "bb746a81-39b4-404b-8114-422de91c4317",
+      "name": "⚙️ Extract Render Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 60,
+        "unit": "seconds"
+      },
+      "id": "d2d55c3f-7334-43c7-862d-213abc83635d",
+      "name": "⏳ Wait 60s for Render",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        832,
+        304
+      ],
+      "webhookId": "a40c132d-9911-4939-a303-f79ed594d1cd"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.creatomate.com/v1/renders/{{ $json.render_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_CREATOMATE_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "63a81155-0ca9-4c87-aa55-48637924af47",
+      "name": "🎬 Creatomate — Poll Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        944,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst status = data.status;\nconst url = data.url;\n\nif (status === 'failed') {\n  throw new Error('Creatomate render failed: ' + (data.error_message || JSON.stringify(data)));\n}\n\nif (status !== 'succeeded' || !url) {\n  throw new Error('Render not ready, status: ' + status + '. Try re-running in 30s.');\n}\n\nconst concept = $('⚙️ Parse Claude JSON').first().json;\n\nreturn [{ json: { \n  ...concept,\n  render_id: data.id,\n  final_video_url: url,\n  render_status: status\n} }];"
+      },
+      "id": "8b2e7134-c3ce-4f1e-b734-2e327474d489",
+      "name": "⚙️ Check Render Done",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.final_video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "dbfd1221-82ef-4b46-95a8-05251ad32ed0",
+      "name": "⬇️ Download Final Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        976,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const concept = $('⚙️ Check Render Done').first().json;\nreturn [{\n  json: concept,\n  binary: $input.first().binary\n}];"
+      },
+      "id": "69f80aa3-9e48-4d19-9b2e-1c37497b6677",
+      "name": "⚙️ Merge Video + Metadata",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "upload",
+        "title": "={{ $json.youtube_title }} #Shorts",
+        "regionCode": "US",
+        "categoryId": "10",
+        "options": {
+          "description": "={{ $json.youtube_description }}",
+          "privacyStatus": "public",
+          "tags": "={{ $json.youtube_tags.join(',') }}"
+        }
+      },
+      "id": "3b6afe93-28e3-4424-aab4-d6e65efe90f2",
+      "name": "▶️ YouTube — Publish Short",
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        384
+      ],
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "7sp17Tclk8ha0ejv",
+          "name": "YouTube account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const yt = $input.first().json;\nconst videoId = yt.uploadId;  // ← было yt.id\nconst concept = $('⚙️ Merge Video + Metadata').first().json;\nreturn [{ json: {\n  video_id: videoId,\n  youtube_url: 'https://youtube.com/shorts/' + videoId,\n  theme: concept.theme,\n  title: concept.youtube_title\n}}];"
+      },
+      "id": "58f4c057-1832-4640-9908-bb21e4999e10",
+      "name": "⚙️ Extract YouTube URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=✅ New video published!\n\n🎨 Theme: *{{ $json.theme }}*\n📹 {{ $json.title }}\n🔗 {{ $json.youtube_url }}\n\n_WAVEGEN AI Pipeline developed by DIAS_",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "40401a84-8abb-47bc-9074-39f8f971d976",
+      "name": "📱 Telegram — Notify",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1904,
+        384
+      ],
+      "webhookId": "1ad5d14f-f068-4f83-86f9-b38013556f55",
+      "credentials": {
+        "telegramApi": {
+          "id": "xg0jcV1dFIGj0eo4",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://tmpfiles.org/api/v1/upload",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0efa12c3-8f04-40ec-98f4-5eac4bf8980b",
+      "name": "☁️ Upload Audio to TMP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        96,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wavegen-trigger",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -752,
+        176
+      ],
+      "id": "6d3bd9cc-07bf-42b9-8653-f042595528d2",
+      "name": "Webhook",
+      "webhookId": "564e6bac-4333-4dd3-b467-805bca4cba01"
+    },
+    {
+      "parameters": {
+        "jsCode": "const binaryData = $input.first().binary;\nconst jsonData = $input.first().json;\n\n// Переименовываем файл из data.mpga в audio.mp3\nreturn [{\n  json: jsonData,\n  binary: {\n    data: {\n      ...binaryData.data,\n      fileName: 'audio.mp3',\n      fileExtension: 'mp3',\n      mimeType: 'audio/mpeg'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        368
+      ],
+      "id": "af064f56-2962-4b03-95af-3a1243f8a8c2",
+      "name": "⚙️ Rename Audio File"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "⏰ Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "🧠 Claude — Generate Concept",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🧠 Claude — Generate Concept": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Parse Claude JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Parse Claude JSON": {
+      "main": [
+        [
+          {
+            "node": "🎵 ElevenLabs — Generate Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎵 ElevenLabs — Generate Audio": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Rename Audio File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Extract Audio URL": {
+      "main": [
+        [
+          {
+            "node": "🎬 Pexels — Search Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎬 Pexels — Search Video": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Pick Portrait Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Pick Portrait Video": {
+      "main": [
+        [
+          {
+            "node": "🎬 Creatomate — Render Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎬 Creatomate — Render Video": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Extract Render Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Extract Render Info": {
+      "main": [
+        [
+          {
+            "node": "⏳ Wait 60s for Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⏳ Wait 60s for Render": {
+      "main": [
+        [
+          {
+            "node": "🎬 Creatomate — Poll Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎬 Creatomate — Poll Status": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Check Render Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Check Render Done": {
+      "main": [
+        [
+          {
+            "node": "⬇️ Download Final Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⬇️ Download Final Video": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Merge Video + Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Merge Video + Metadata": {
+      "main": [
+        [
+          {
+            "node": "▶️ YouTube — Publish Short",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "▶️ YouTube — Publish Short": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Extract YouTube URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Extract YouTube URL": {
+      "main": [
+        [
+          {
+            "node": "📱 Telegram — Notify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "☁️ Upload Audio to TMP": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Extract Audio URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "🧠 Claude — Generate Concept",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "⚙️ Rename Audio File": {
+      "main": [
+        [
+          {
+            "node": "☁️ Upload Audio to TMP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4ed457d1-6e08-48f9-91f9-b1e75a1927f2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_N8N_INSTANCE_ID"
+  },
+  "id": "YOUR_WORKFLOW_ID",
+  "tags": []
+}
